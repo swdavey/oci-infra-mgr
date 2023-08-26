@@ -1,36 +1,38 @@
 # oci-infra-mgr
 The scripted starting and stopping of OCI objects. 
 
-## Introduction
-The purpose of this project is to demonstrate how the OCI SDK can be used to automatically shutdown and startup OCI objects (e.g. compute instances, MySQL HeatWave instances, etc.). The reason for wanting to shutdown objects is to save money: in OCI you are only charged for the resource you use. For example a compute instance (Virtual Machine) is typically comprised of the following chargeable components: OCPUs (cores), memory and storage. If a compute instance is shutdown its cores and memory are freed and no charge is levied. Note that storage will still be charged, because the compute instance's OS and user files remain in place. However, the bulk of the cost is in cores and memory, therefore if a non-critical compute instance can be shutdown for even a small period of time considerable savings can be made.
-
 Please note: if you choose to use the software that this site provides you do so entirely at your own risk. There are no guarantees or warantees associated with this software. It is your responsibility to test and prove that it is fit for your purposes.
 
+## Introduction
+The purpose of this project is to demonstrate how the OCI SDK can be used to automatically shutdown and startup OCI objects (e.g. compute instances, MySQL HeatWave instances, etc.). 
+
+The reason for wanting to shutdown objects is to save money: in OCI you are only charged for the resource you use. For example a compute instance (Virtual Machine) is typically comprised of the following chargeable components: OCPUs (cores), memory and storage. If a compute instance is shutdown its cores and memory are freed and no charge is levied. Note that storage will still be charged, because the compute instance's OS and user files remain in place. However, the bulk of the cost is in cores and memory, therefore if a non-critical compute instance can be shutdown for even a small period of time then considerable savings can be made.
+
 ## High-Level Requirements
-It is envisaged that this project will typically be used with OCI objects that have non-critical roles, for example compute instances in non-production environments, and that the tenancy owners will want to schedule their shutdown and startup to coincide with office hours. Therefore the primary requirement for this project can be described as the scheduled shutdown and startup of multiple OCI objects across multiple environments.
+It is envisaged that this project will typically be used with OCI objects that have non-critical roles, for example compute instances in non-production environments. It is further envisaged that tenancy owners will want to schedule their shutdowns and startups to coincide with office hours. Therefore the primary requirement for this project can be described as the scheduled shutdown and startup of multiple OCI objects across multiple environments.
 
-It is very likely there will be exceptional circumstances where an OCI object will either need to remain in either a running or shutdown state. 
+It is very likely there will be exceptional circumstances where an OCI object will either need to either remain in a running or shutdown state (i.e. excluded from being shutdown or started up). 
 
-A method of describing the OCI objects to be started and shutdown which should be flexible enough to allow the exclusion of objects that need to either remain running or shutdown.
+A method of describing the OCI objects to be started and shutdown will be required. This should be flexible enough to allow for the exceptional exclusion of objects from being started or stopped.
 
-The project's script must authenticate with the OCI tenancy and must be authorized to make changes to the OCI objects it wants to stop and start.
+The script's OCI user must authenticate with the OCI tenancy in which the objects to be stopped and started reside. The script's OCI user must also be authorized to stop and start objects. Further, all communications between the tenancy and where the script is run from must be secure.
 
-The projects script must provide a log of its actions so that its owners can be assured it is functioning correctly and to otherwise assist in any post-mortem activities.
+The script must provide a log of its actions so that its correct working can be verified and in cases when objects fail to start or stop to provide reasons accordingly.
 
 The project will also need to consider testing, packaging/deployment and how the script may be extended.
 
 ## Response to High Level Requirements
-Use of Python OCI SDK to script the startup and shutdown of objects. The SDK provides a full API that will allow the startup and shutdown of OCI objects. Python comes with many libraries that will facilitate the creation of the scripted solution, for example: logging, parsing of JSON files, command line options, etc. Python also has utilities that can package the scripting atefacts into a single file which simplifies deployment. Both the API and Python support the extendability of the script. 
+Use of the OCI Python SDK to script the startup and shutdown of objects. The SDK provides a full API that will allow the startup and shutdown of OCI objects. Further, Python comes with many libraries that will facilitate the creation of the scripted solution, for example: logging, parsing of JSON files, command line options, etc. Python also has utilities that can package the scripting atefacts into a single file which simplifies deployment. Both the API and Python support the extendability of the script. 
 
-The OCI SDK uses the OCI CLI configuration file to both provide authentication with a customer's OCI tenancy and to secure communications between the end points (i.e. from where the script is run to the OCI tenancy).
+The OCI SDK uses the OCI CLI configuration file to provide authentication with a customer's OCI tenancy, authorization to perform actions within the tenancy and to secure communications between the end points.
 
-A small compute instance (possibly from the OCI free tier) will be used to host and run the script. The operating system will be Oracle Linux 8 which includes cron, an OS scheduling utility that invokes scripts and programs to run at particular times. Note that Python does not preclude the use of other operating systems. Indeed almost any mainstream operating system could be used which supports Python so long as it has a similar scheduling facility to cron.  
+A small compute instance (possibly from the OCI free tier) will be used to host and run the script. The operating system will be Oracle Linux 8 which includes `cron`, an OS scheduling utility that invokes scripts and programs to run at particular times. Note that Python does not preclude the use of other operating systems. Indeed almost any mainstream operating system could be used which supports Python so long as it has a similar scheduling facility to `cron`.  
 
-A JSON schema will be developed that will allow the user to precisely detail the OCI objects that will be started and shutdown. The schema will make provision for identifying exceptional cases where a scheduled run should not invoke either a start-up or shutdown.  
+A JSON schema will be developed that will allow the user to precisely detail the OCI objects that will be started and shutdown. The schema will make provision for identifying exceptional cases when a scheduled run should not invoke either a start-up or shutdown on an object or objects.  
 
 ## Describing the infrastructure to be started and stopped: infra.json
 
-OCI objects are logically separated into compartments. Compartments may be used to separate user sandboxes, whole environments, or work-specific areas such as networks. Compartments and OCI objects can all be identified by a unique identifier called and OCID. An OCID is a long string of nonsensical characters. Machines have no problem using OCIDs to identify objects but humans find it very difficult. Consequently, humans prefer user-friendly names. The problem with names is OCI allows duplicate names to be used. Therefore, to allow correct identification of an OCI Object by both humans and machines a combination of compartment name, compartment OCID, object name and object OCID is required. 
+OCI objects are logically separated into compartments. Compartments may be used to describe user sandboxes, whole environments, or work-specific areas such as networks, etc. Compartments and OCI objects can all be identified by a unique identifier called and OCID. An OCID is a long string of seemingly nonsensical characters. Machines have no problem using OCIDs to identify objects but humans find it very difficult. Consequently, humans prefer user-friendly names. The problem with names is OCI allows duplicate names to be used. Therefore, to allow correct identification of an OCI Object by both humans and machines a combination of compartment name, compartment OCID, object name and object OCID is required. 
 
 From a scripting perspective the object's type (e.g. compute instance, MySQL HeatWave database service) will also need to be specified. This is because an object of one type might need to started or stopped in a slightly different manner to an object of another type (these differences are reflected in the OCI SDK's API). Finally, in order to be able to exclude an object from a specific action (i.e. start and stop), an exclude flag is needed (i.e. if set to true then the object won't be stopped or started).
 
@@ -97,17 +99,18 @@ Sometimes schemas can be a little difficult to understand and so here is an impl
 ```
 Some points to note:
 * The JSON describes two compartments: `david_sandbox` and `project_XYZ_dev_env`.
-* The first compartment details three objects which are candidates for starting and stopping, whereas the second compartment only has two objects. It is not necessary to specify every object in each compartment; only specify the objects you want.
-* Note that for the objects there is duplication of names but not OCIDs. OCIDs are always unique.
+* The first compartment details three objects which are candidates for starting and stopping, whereas the second compartment only has two objects. It is not necessary to specify every object in every compartment; only specify the objects you want.
 * The compute instance object app2 has its `exclude` key set to `true`. This means no action (i.e. stop or start) will be performed on this object when the script runs.
 * OCID strings have been obfuscated and reduced in length for the purpose of illustrations
 
 ## Script Walkthrough
 The script comprises two source code files, `infraMgr.py` and `infraArgs.py`:
 * `infraMgr.py` provides the logic to perform the starting/stopping of OCI objects.
-* `infraArgs.py` provides two classes that are used in the handling of command line arguments: `InfraArgs` and `InfraArgsError`
+* `infraArgs.py` provides two classes that are used in the handling of command line arguments: `InfraArgs` and `InfraArgsError`.
 
-At the top of the infraMgr.py script is a set of imports:
+Please refer to the source code when reading through the following.
+
+At the top of the `infraMgr.py` script is a set of imports:
 * `json` is required to provide the functionality to load and parse the infrastructure description file, infra.json (described above)
 * `getopt` works with the `InfraArgs` classes to provide command line handling
 * `logger` provides logging functionality
@@ -136,7 +139,7 @@ The `try` block begins by parsing the command line. If a `-h` or `--help` flag w
 
 On completion of the above three tasks the main function will process the OCI objects. It does this by calling the script's `process_infrastructure()` function. This function takes three parameters: the variable holding the infastructure details, the action (START or STOP) to be applied to the infrastructure details, and the variable holding the OCI configuration details (to allow secure communications).
 
-The `process_infrastructure()` function implements a nested loop: the outer loop iterates through the compartments and the inner loop iterates through each compartment's objects. If an object has its `exclude` key set to `true` then all that happens is a log entry detailing that the object will not be actioned. Otherwise, the type of the object is interrogated. If the object is of a COMPUTE_INSTANCE type then a call will be made to the `switch_compute()` function, whereas if the object is of a `MYSQL_DATABASE` type a call will be made to the `switch_mysql()` function. The `switch_compute()` and `switch_mysql()` functions take the same parameters: the variable holding the OCI configuration, the object to be actioned OCID, the name of the compartment the object belongs to, and the action to be performed on the object. The two functions perform the same task, either starting or stopping an object, but because they are of different types they use different states to describe being started or stopped, and in the case of `switch_mysql()` it is necessary to create an object that describes how a MySQL instance should be taken down. The flow of both functions can be described as follows:
+The `process_infrastructure()` function implements a nested loop: the outer loop iterates through the compartments and the inner loop iterates through each compartment's objects. If an object has its `exclude` key set to `true` then all that happens is a log entry detailing that the object will not be actioned. Otherwise, the type of the object is interrogated. If the object is of a `COMPUTE_INSTANCE` type then a call will be made to the `switch_compute()` function, whereas if the object is of a `MYSQL_DATABASE` type a call will be made to the `switch_mysql()` function. The `switch_compute()` and `switch_mysql()` functions take the same parameters: the variable holding the OCI configuration, the object to be actioned OCID, the name of the compartment the object belongs to, and the action to be performed on the object. The two functions perform the same task, either starting or stopping an object, but because they are of different types they use different states to describe being started or stopped, and in the case of `switch_mysql()` it is necessary to create an object that describes how a MySQL instance should be taken down. The flow of both functions can be described as follows:
 
 * Get a client object from the tenancy
     * Client objects provide a handle to get instances of the same type and modify the same. Conceptually they act a little like a manager but given they are on the client side of the tenancy's REST server they are referred to as a client. 
@@ -233,33 +236,33 @@ Now run some tests that stop and start the objects in the infrastructure file. I
 
 ```console
 opc@myhost$ python infraMgr.py -a STOP
-opc@myhost$ tail -f /var/log/infra/infra
+opc@myhost$ tail -20 /var/log/infra/infra.log
 # Go to the OCI Console and wait until all objects have been stopped before proceeding
 opc@myhost$ python infraMgr.py -a START
-opc@myhost$ tail -f /var/log/infra/infra
+opc@myhost$ tail -20 /var/log/infra/infra.log
 # Go to the OCI Console and wait until all objects have been started before proceeding
 opc@myhost$ python infraMgr.py --action STOP
-opc@myhost$ tail -f /var/log/infra/infra
+opc@myhost$ tail -20 /var/log/infra/infra.log
 # Immediately run the following request - you should see warnings in the log file
 opc@myhost$ python infraMgr.py --action START
-opc@myhost$ tail -f /var/log/infra/infra
+opc@myhost$ tail -20 /var/log/infra/infra.log
 ```
 
 Once all the objects have been started, edit the infrastructure file and set `exclude` to `true` for some of the objects and then run the following commands (waiting for the OCI tasks to complete between runs). Using the log and the 
 
 ```console
 opc@myhost$ python infraMgr.py -a STOP
-opc@myhost$ tail -f /var/log/infra/infra
+opc@myhost$ tail -20 /var/log/infra/infra.log
 # Go to the OCI Console and wait until all non-excluded objects have been stopped before proceeding
 opc@myhost$ python infraMgr.py -a START
-opc@myhost$ tail -f /var/log/infra/infra
+opc@myhost$ tail -20 /var/log/infra/infra.log
 ```
 
 Return the infrastructure file to its original state, then run the following command to investigate what DEBUG logging level provides:
 
 ```console
 opc@myhost$ python infraMgr.py -a STOP -v DEBUG
-opc@myhost$ tail -f /var/log/infra/infra
+opc@myhost$ tail -20 /var/log/infra/infra.log
 ```
 
 Other test suggestions:
@@ -280,8 +283,9 @@ import logging
 and then changing the permissions on this file to make it executable, it is possible to remove the need for `python` on the command line, for example
 
 ```console
-opc@myhost$ chmod 0744 infraMgr.py
+opc@myhost$ chmod 0764 infraMgr.py
 opc@myhost$ ls -l infraMgr.py
+-rwxrw-r--. 1 opc opc 9952 Aug 25 08:53 infraMgr.py
 opc@myhost$ ./infraMgr.py --help
 
   Usage
@@ -304,9 +308,9 @@ opc@myhost$ pyinstaller --onefile infraMgr.py
 opc@myhost$ ls -l
 total 16
 drwxrwxr-x. 2 opc opc   22 Aug 25 13:50 dist
--rw-rw-r--. 1 opc opc 1817 Aug 25 08:54 infra.json
+-rwxrw-r--. 1 opc opc 1817 Aug 25 08:54 infra.json
 -rw-rw-r--. 1 opc opc 9952 Aug 25 08:53 infraMgr.py
-drwxrwxr-x. 2 opc opc   69 Aug 25 13:50 __pycache_
+drwxrwxr-x. 2 opc opc   69 Aug 25 13:50 __pycache__
 opc@myhost$ ls -l dist
 total 28524
 -rwxr-xr-x. 1 opc opc 29206744 Aug 25 13:50 infraMgr
